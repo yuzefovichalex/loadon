@@ -1,2 +1,3 @@
+include ':loadon'
 include ':app'
 rootProject.name = "Loadon"

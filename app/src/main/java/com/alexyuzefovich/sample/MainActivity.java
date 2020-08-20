@@ -1,4 +1,4 @@
-package com.alexyuzefovich.loadon;
+package com.alexyuzefovich.sample;
 
 import androidx.appcompat.app.AppCompatActivity;
 
