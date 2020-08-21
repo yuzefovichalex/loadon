@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="Loadon" parent="Widget.MaterialComponents.Button">
+        <item name="android:background">@drawable/shape_default_background</item>
+        <item name="android:stateListAnimator">@animator/loadon_state_list_animator</item>
+    </style>
+
+</resources>
