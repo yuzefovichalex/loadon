@@ -25,9 +25,7 @@ public class Loadon extends View {
         EXTENDING
     }
 
-    private static final int BASE_OFFSET = 32;
-
-    private static final long SIZE_ANIMATION_DURATION = 5000L;
+    private static final long SIZE_ANIMATION_DURATION = 500L;
 
     private static final float DEFAULT_TEXT_SIZE = 15f;
     private static final int DEFAULT_TEXT_COLOR = Color.BLACK;
@@ -41,6 +39,9 @@ public class Loadon extends View {
     private StaticLayout staticLayout;
 
     private State state = State.NORMAL;
+
+    private int normalWidth;
+    private int normalHeight;
 
     @NonNull
     private ValueAnimator sizeAnimator = new ValueAnimator();
@@ -82,13 +83,9 @@ public class Loadon extends View {
         textPaint.setColor(textColor);
         textPaint.setAntiAlias(true);
 
-        final int textWidth = (int) textPaint.measureText(text);
-        staticLayout = new StaticLayout(
-                text,
-                textPaint,
-                textWidth,
-                Layout.Alignment.ALIGN_NORMAL,
-                1f, 0, false);
+        makeLayout();
+        normalWidth = staticLayout.getWidth();
+        normalHeight = staticLayout.getHeight();
     }
 
     private void initSizeAnimator() {
@@ -133,31 +130,40 @@ public class Loadon extends View {
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        int width = state == State.NORMAL ? staticLayout.getWidth() + BASE_OFFSET * 2 : x;
-        int height = staticLayout.getHeight() + BASE_OFFSET * 2;
-        setMeasuredDimension(width, height);
+        int width = state == State.NORMAL ? normalWidth : x;
+        if (state != State.NORMAL) {
+            final float sizeMultiplier = ((float) x - normalHeight) / (normalWidth - normalHeight);
+            final int multipliedAlpha = (int) (sizeMultiplier * 255);
+            final float multipliedTextSize = sizeMultiplier * this.textSize;
+            textPaint.setAlpha(multipliedAlpha);
+            textPaint.setTextSize(multipliedTextSize);
+        } else {
+            textPaint.setTextSize(textSize);
+            textPaint.setAlpha(255);
+        }
+        makeLayout();
+        setMeasuredDimension(width, normalHeight);
     }
 
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
         canvas.save();
-
-        if (state != State.NORMAL) {
-            float m = ((float) x - getHeight()) / (staticLayout.getWidth() + 64 - getHeight());
-            int alpha = (int) (m * 255);
-            float textSize = m * this.textSize;
-            textPaint.setAlpha(alpha);
-            textPaint.setTextSize(textSize);
-        } else {
-            textPaint.setTextSize(textSize);
-            textPaint.setAlpha(255);
-        }
-        canvas.translate(32, 32);
-
-
+        final float translationX = (getWidth() - staticLayout.getWidth()) / 2f;
+        final float translationY = (normalHeight - staticLayout.getHeight()) / 2f;
+        canvas.translate(translationX, translationY);
         staticLayout.draw(canvas);
         canvas.restore();
+    }
+
+    private void makeLayout() {
+        final int textWidth = (int) textPaint.measureText(text);
+        staticLayout = new StaticLayout(
+                text,
+                textPaint,
+                textWidth,
+                Layout.Alignment.ALIGN_NORMAL,
+                1f, 0, false);
     }
 
     public void startLoading() {
@@ -165,7 +171,7 @@ public class Loadon extends View {
             return;
         }
         sizeAnimator.cancel();
-        sizeAnimator.setIntValues(getWidth(), getHeight());
+        sizeAnimator.setIntValues(getWidth(), normalHeight);
         sizeAnimator.start();
     }
 
@@ -174,7 +180,7 @@ public class Loadon extends View {
             return;
         }
         sizeAnimator.cancel();
-        sizeAnimator.setIntValues(getWidth(), staticLayout.getWidth() + 64);
+        sizeAnimator.setIntValues(getWidth(), normalWidth);
         sizeAnimator.start();
     }
 
