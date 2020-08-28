@@ -10,10 +10,12 @@ import android.content.res.TypedArray;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.RectF;
 import android.text.Layout;
 import android.text.StaticLayout;
 import android.text.TextPaint;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.View;
 import android.view.animation.LinearInterpolator;
 
@@ -219,7 +221,7 @@ public class Loadon extends View {
         }
 
 
-        private int currentAnimatedValue = 0;
+        private float currentAnimatedValue = 0f;
 
         @NonNull
         private ValueAnimator progressIndicatorAnimator = new ValueAnimator();
@@ -233,7 +235,7 @@ public class Loadon extends View {
         }
 
 
-        public int getCurrentAnimatedValue() {
+        public float getCurrentAnimatedValue() {
             return currentAnimatedValue;
         }
 
@@ -243,6 +245,7 @@ public class Loadon extends View {
         }
 
 
+        public abstract float[] getValues();
         public abstract int getRepeatCount();
         public abstract int getRepeatMode();
         public abstract long getDuration();
@@ -256,13 +259,13 @@ public class Loadon extends View {
 
 
         private void initProgressIndicatorAnimator() {
-            progressIndicatorAnimator.setIntValues(0, 100);
+            progressIndicatorAnimator.setFloatValues(getValues());
             progressIndicatorAnimator.setRepeatCount(getRepeatCount());
             progressIndicatorAnimator.setRepeatMode(getRepeatMode());
             progressIndicatorAnimator.setInterpolator(getInterpolator());
             progressIndicatorAnimator.setDuration(getDuration());
             progressIndicatorAnimator.addUpdateListener(animation -> {
-                currentAnimatedValue = (int) animation.getAnimatedValue();
+                currentAnimatedValue = (float) animation.getAnimatedValue();
                 if (animatedValueUpdatedListener != null) {
                     animatedValueUpdatedListener.onAnimatedValueUpdated();
                 }
@@ -275,6 +278,11 @@ public class Loadon extends View {
 
     public static class DefaultProgressIndicator extends ProgressIndicator {
 
+        private static final float STROKE_WIDTH = 10f;
+
+        @NonNull
+        private RectF indicatorRect = new RectF();
+
         @NonNull
         private Paint paint = new Paint();
 
@@ -286,8 +294,16 @@ public class Loadon extends View {
         private void initPaint() {
             paint.setColor(Color.BLACK);
             paint.setAntiAlias(true);
+            paint.setStrokeWidth(STROKE_WIDTH);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeCap(Paint.Cap.ROUND);
         }
 
+
+        @Override
+        public float[] getValues() {
+            return new float[] { 0f, 8f };
+        }
 
         @Override
         public int getRepeatCount() {
@@ -296,12 +312,12 @@ public class Loadon extends View {
 
         @Override
         public int getRepeatMode() {
-            return ValueAnimator.REVERSE;
+            return ValueAnimator.RESTART;
         }
 
         @Override
         public long getDuration() {
-            return 500L;
+            return 30000L;
         }
 
         @NonNull
@@ -313,12 +329,23 @@ public class Loadon extends View {
 
         @Override
         public void draw(Loadon loadon, Canvas canvas) {
-            canvas.drawCircle(
-                    loadon.getWidth() / 2f,
-                    loadon.getHeight() / 2f,
-                    loadon.getWidth() / 2f * (getCurrentAnimatedValue() / 100f),
-                    paint
-            );
+            indicatorRect.set(
+                    STROKE_WIDTH,
+                    STROKE_WIDTH,
+                    loadon.getWidth() - STROKE_WIDTH,
+                    loadon.getHeight() - STROKE_WIDTH);
+            final int iteration = (int) getCurrentAnimatedValue() / 2;
+            final float animValue = getCurrentAnimatedValue() - (float) ((int) getCurrentAnimatedValue() / 2 * 2);
+            canvas.save();
+            canvas.rotate(-90 * iteration + 360 * animValue, loadon.getWidth() / 2f, loadon.getHeight() / 2f);
+            final float startAngle = animValue <= 1f
+                    ? 0f
+                    : 270 * (animValue - 1f);
+            final float sweepAngle = animValue <= 1f
+                    ? 270 * animValue + 30
+                    : 270 * (2f - animValue) + 30;
+            canvas.drawArc(indicatorRect, startAngle, sweepAngle, false, paint);
+            canvas.restore();
         }
 
     }
