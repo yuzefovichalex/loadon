@@ -15,7 +15,6 @@ import android.text.Layout;
 import android.text.StaticLayout;
 import android.text.TextPaint;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.View;
 import android.view.animation.LinearInterpolator;
 
@@ -278,7 +277,15 @@ public class Loadon extends View {
 
     public static class DefaultProgressIndicator extends ProgressIndicator {
 
-        private static final float STROKE_WIDTH = 10f;
+        private static final float STROKE_SIZE = 10f;
+
+        private static final float MIN_ARC_ANGLE = 30f;
+        private static final float FULL_ARC_ANGLE = 270f;
+
+        private static final float START_ANIMATION_VALUE = 0f;
+        private static final float END_ANIMATION_VALUE = 8f;
+
+        private static final long ANIMATION_DURATION = 8000L;
 
         @NonNull
         private RectF indicatorRect = new RectF();
@@ -294,7 +301,7 @@ public class Loadon extends View {
         private void initPaint() {
             paint.setColor(Color.BLACK);
             paint.setAntiAlias(true);
-            paint.setStrokeWidth(STROKE_WIDTH);
+            paint.setStrokeWidth(STROKE_SIZE);
             paint.setStyle(Paint.Style.STROKE);
             paint.setStrokeCap(Paint.Cap.ROUND);
         }
@@ -302,7 +309,7 @@ public class Loadon extends View {
 
         @Override
         public float[] getValues() {
-            return new float[] { 0f, 8f };
+            return new float[] { START_ANIMATION_VALUE, END_ANIMATION_VALUE };
         }
 
         @Override
@@ -317,7 +324,7 @@ public class Loadon extends View {
 
         @Override
         public long getDuration() {
-            return 30000L;
+            return ANIMATION_DURATION;
         }
 
         @NonNull
@@ -329,22 +336,27 @@ public class Loadon extends View {
 
         @Override
         public void draw(Loadon loadon, Canvas canvas) {
-            indicatorRect.set(
-                    STROKE_WIDTH,
-                    STROKE_WIDTH,
-                    loadon.getWidth() - STROKE_WIDTH,
-                    loadon.getHeight() - STROKE_WIDTH);
+            final int width = loadon.getWidth();
+            final int height = loadon.getHeight();
+            indicatorRect.set(0f, 0f, width, height);
+            indicatorRect.inset(STROKE_SIZE, STROKE_SIZE);
+
             final int iteration = (int) getCurrentAnimatedValue() / 2;
-            final float animValue = getCurrentAnimatedValue() - (float) ((int) getCurrentAnimatedValue() / 2 * 2);
+            final float animValue = getCurrentAnimatedValue() - iteration * 2f;
+
             canvas.save();
-            canvas.rotate(-90 * iteration + 360 * animValue, loadon.getWidth() / 2f, loadon.getHeight() / 2f);
+
+            final float rotationAngle = -90f * iteration + 360f * animValue;
+            canvas.rotate(rotationAngle, indicatorRect.centerX(), indicatorRect.centerY());
+
             final float startAngle = animValue <= 1f
                     ? 0f
-                    : 270 * (animValue - 1f);
+                    : FULL_ARC_ANGLE * (animValue - 1f);
             final float sweepAngle = animValue <= 1f
-                    ? 270 * animValue + 30
-                    : 270 * (2f - animValue) + 30;
+                    ? FULL_ARC_ANGLE * animValue + MIN_ARC_ANGLE
+                    : FULL_ARC_ANGLE * (2f - animValue) + MIN_ARC_ANGLE;
             canvas.drawArc(indicatorRect, startAngle, sweepAngle, false, paint);
+
             canvas.restore();
         }
 
