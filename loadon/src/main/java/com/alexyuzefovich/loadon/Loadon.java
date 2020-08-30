@@ -21,6 +21,9 @@ import android.view.animation.LinearInterpolator;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+
 public class Loadon extends View {
 
     enum State {
@@ -41,6 +44,9 @@ public class Loadon extends View {
     private float textSize = DEFAULT_TEXT_SIZE;
     private int textColor = DEFAULT_TEXT_COLOR;
 
+    private static final Class<?>[] PROGRESS_INDICATOR_CONSTRUCTOR_SIGNATURE =
+            new Class<?>[]{Context.class, AttributeSet.class, int.class, int.class};
+
     private StaticLayout staticLayout;
 
     private State state = State.NORMAL;
@@ -54,7 +60,7 @@ public class Loadon extends View {
     private ValueAnimator sizeAnimator = new ValueAnimator();
 
     @NonNull
-    private ProgressIndicator progressIndicator = new DefaultProgressIndicator();
+    private ProgressIndicator progressIndicator;
 
     @NonNull
     private AnimatorSet stateAnimator = new AnimatorSet();
@@ -72,6 +78,8 @@ public class Loadon extends View {
                     R.styleable.Loadon,
                     0, 0);
             initTextDrawing(ta);
+            final String progressIndicatorClassName = ta.getString(R.styleable.Loadon_progressIndicator);
+            createProgressIndicator(context, progressIndicatorClassName, attrs, 0, 0);
             ta.recycle();
         }
         initStateAnimator();
@@ -152,6 +160,67 @@ public class Loadon extends View {
         progressIndicator.setAnimatedValueUpdatedListener(this::invalidate);
     }
 
+    private void createProgressIndicator(Context context, String className, AttributeSet attrs,
+                                     int defStyleAttr, int defStyleRes) {
+        if (className != null) {
+            className = className.trim();
+            if (!className.isEmpty()) {
+                className = getFullClassName(context, className);
+                try {
+                    ClassLoader classLoader;
+                    if (isInEditMode()) {
+                        // Stupid layoutlib cannot handle simple class loaders.
+                        classLoader = this.getClass().getClassLoader();
+                    } else {
+                        classLoader = context.getClassLoader();
+                    }
+                    Class<? extends Loadon.ProgressIndicator> progressIndicatorClass =
+                            Class.forName(className, false, classLoader)
+                                    .asSubclass(Loadon.ProgressIndicator.class);
+                    Constructor<? extends Loadon.ProgressIndicator> constructor;
+                    Object[] constructorArgs = null;
+                    try {
+                        constructor = progressIndicatorClass
+                                .getConstructor(PROGRESS_INDICATOR_CONSTRUCTOR_SIGNATURE);
+                        constructorArgs = new Object[]{context, attrs, defStyleAttr, defStyleRes};
+                    } catch (NoSuchMethodException e) {
+                        try {
+                            constructor = progressIndicatorClass.getConstructor();
+                        } catch (NoSuchMethodException e1) {
+                            e1.initCause(e);
+                            throw new IllegalStateException(attrs.getPositionDescription()
+                                    + ": Error creating ProgressIndicator " + className, e1);
+                        }
+                    }
+                    constructor.setAccessible(true);
+                    progressIndicator = constructor.newInstance(constructorArgs);
+                } catch (ClassNotFoundException e) {
+                    throw new IllegalStateException(attrs.getPositionDescription()
+                            + ": Unable to find ProgressIndicator " + className, e);
+                } catch (InvocationTargetException | InstantiationException e) {
+                    throw new IllegalStateException(attrs.getPositionDescription()
+                            + ": Could not instantiate the ProgressIndicator: " + className, e);
+                } catch (IllegalAccessException e) {
+                    throw new IllegalStateException(attrs.getPositionDescription()
+                            + ": Cannot access non-public constructor " + className, e);
+                } catch (ClassCastException e) {
+                    throw new IllegalStateException(attrs.getPositionDescription()
+                            + ": Class is not a ProgressIndicator " + className, e);
+                }
+            }
+        }
+    }
+
+    private String getFullClassName(Context context, String className) {
+        if (className.charAt(0) == '.') {
+            return context.getPackageName() + className;
+        }
+        if (className.contains(".")) {
+            return className;
+        }
+        return Loadon.class.getPackage().getName() + '.' + className;
+    }
+
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         int width = state == State.NORMAL ? normalWidth : x;
@@ -220,6 +289,8 @@ public class Loadon extends View {
         }
 
 
+        private int progressIndicatorColor;
+
         private float currentAnimatedValue = 0f;
 
         @NonNull
@@ -233,6 +304,26 @@ public class Loadon extends View {
             initProgressIndicatorAnimator();
         }
 
+        public ProgressIndicator(
+                Context context,
+                AttributeSet attrs,
+                int defStyleAttr,
+                int defStyleRes
+        ) {
+            TypedArray ta = context.getTheme().obtainStyledAttributes(
+                    attrs,
+                    R.styleable.Loadon,
+                    0, 0);
+            final int textColor = ta.getColor(R.styleable.Loadon_textColor, DEFAULT_TEXT_COLOR);
+            progressIndicatorColor = ta.getColor(R.styleable.Loadon_progressIndicatorColor, textColor);
+            ta.recycle();
+            initProgressIndicatorAnimator();
+        }
+
+
+        public int getProgressIndicatorColor() {
+            return progressIndicatorColor;
+        }
 
         public float getCurrentAnimatedValue() {
             return currentAnimatedValue;
@@ -298,8 +389,18 @@ public class Loadon extends View {
             initPaint();
         }
 
+        public DefaultProgressIndicator(
+                Context context,
+                AttributeSet attrs,
+                int defStyleAttr,
+                int defStyleRes
+        ) {
+            super(context, attrs, defStyleAttr, defStyleRes);
+            initPaint();
+        }
+
         private void initPaint() {
-            paint.setColor(Color.BLACK);
+            paint.setColor(getProgressIndicatorColor());
             paint.setAntiAlias(true);
             paint.setStrokeWidth(STROKE_SIZE);
             paint.setStyle(Paint.Style.STROKE);
