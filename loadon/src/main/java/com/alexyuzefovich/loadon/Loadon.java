@@ -11,6 +11,8 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.RectF;
+import android.os.Parcel;
+import android.os.Parcelable;
 import android.text.Layout;
 import android.text.StaticLayout;
 import android.text.TextPaint;
@@ -20,6 +22,7 @@ import android.view.animation.LinearInterpolator;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.customview.view.AbsSavedState;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
@@ -160,22 +163,6 @@ public class Loadon extends View {
             requestLayout();
         });
         sizeAnimator.addListener(new AnimatorListenerAdapter() {
-            @Override
-            public void onAnimationStart(Animator animation) {
-                switch (state) {
-                    case COLLAPSING:
-                    case LOADING: {
-                        state = State.EXTENDING;
-                        break;
-                    }
-                    case EXTENDING:
-                    case NORMAL: {
-                        state = State.COLLAPSING;
-                        break;
-                    }
-                }
-            }
-
             @Override
             public void onAnimationEnd(Animator animation) {
                 switch (state) {
@@ -330,18 +317,56 @@ public class Loadon extends View {
         if (state == State.LOADING) {
             return;
         }
-        stateAnimator.cancel();
-        sizeAnimator.setIntValues(getWidth(), getCollapsedWidth());
-        stateAnimator.start();
+        startStateAnimation(getWidth(), getCollapsedWidth());
     }
 
     public void stopLoading() {
         if (state == State.NORMAL) {
             return;
         }
+        startStateAnimation(getWidth(), getExpandedWidth());
+    }
+
+    private void startStateAnimation(int sizeStartValue, int sizeEndValue) {
         stateAnimator.cancel();
-        sizeAnimator.setIntValues(getWidth(), getExpandedWidth());
-        sizeAnimator.start();
+        sizeAnimator.setIntValues(sizeStartValue, sizeEndValue);
+        stateAnimator.start();
+        state = sizeStartValue > sizeEndValue ? State.COLLAPSING : State.EXTENDING;
+    }
+
+    @NonNull
+    @Override
+    public Parcelable onSaveInstanceState() {
+        Parcelable superState = super.onSaveInstanceState();
+        SavedState savedState = new SavedState(superState);
+        savedState.state = state;
+        savedState.x = x;
+        return savedState;
+    }
+
+    @Override
+    public void onRestoreInstanceState(@Nullable Parcelable parcelableState) {
+        if (!(parcelableState instanceof SavedState)) {
+            super.onRestoreInstanceState(parcelableState);
+            return;
+        }
+        SavedState savedState = (SavedState) parcelableState;
+        super.onRestoreInstanceState(savedState.getSuperState());
+        state = savedState.state;
+        switch (state) {
+            case EXTENDING: {
+                startStateAnimation(x, getExpandedWidth());
+                return;
+            }
+            case LOADING: {
+                progressIndicator.getAnimator().start();
+                return;
+            }
+            case COLLAPSING: {
+                startStateAnimation(x, getCollapsedWidth());
+            }
+        }
+        x = savedState.x;
     }
 
 
@@ -522,6 +547,59 @@ public class Loadon extends View {
             canvas.restore();
         }
 
+    }
+
+
+    static class SavedState extends AbsSavedState {
+
+        State state;
+
+        int x;
+
+        public SavedState(Parcelable superState) {
+            super(superState);
+        }
+
+        public SavedState(@NonNull Parcel source, ClassLoader loader) {
+            super(source, loader);
+            if (loader == null) {
+                loader = getClass().getClassLoader();
+            }
+            readFromParcel(source);
+        }
+
+        @Override
+        public void writeToParcel(@NonNull Parcel out, int flags) {
+            super.writeToParcel(out, flags);
+            out.writeInt(state.ordinal());
+            out.writeInt(x);
+        }
+
+        private void readFromParcel(@NonNull Parcel in) {
+            state = State.values()[in.readInt()];
+            x = in.readInt();
+        }
+
+        public static final Creator<SavedState> CREATOR =
+                new ClassLoaderCreator<SavedState>() {
+                    @NonNull
+                    @Override
+                    public SavedState createFromParcel(@NonNull Parcel in, ClassLoader loader) {
+                        return new SavedState(in, loader);
+                    }
+
+                    @NonNull
+                    @Override
+                    public SavedState createFromParcel(@NonNull Parcel in) {
+                        return new SavedState(in, null);
+                    }
+
+                    @NonNull
+                    @Override
+                    public SavedState[] newArray(int size) {
+                        return new SavedState[size];
+                    }
+                };
     }
 
 }
