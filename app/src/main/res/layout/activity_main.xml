@@ -15,6 +15,7 @@
         app:text="Start loading"
         app:textSize="48sp"
         app:textColor="@color/colorPrimary"
+        android:padding="8dp"
         app:progressIndicator="com.alexyuzefovich.loadon.Loadon$DefaultProgressIndicator"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintLeft_toLeftOf="parent"

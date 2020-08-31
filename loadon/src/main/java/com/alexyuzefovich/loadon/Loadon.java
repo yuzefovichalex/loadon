@@ -52,8 +52,8 @@ public class Loadon extends View {
     @NonNull
     private State state = State.NORMAL;
 
-    private int normalWidth;
-    private int normalHeight;
+    private int textWidth;
+    private int textHeight;
 
     private int x;
 
@@ -101,6 +101,7 @@ public class Loadon extends View {
     }
 
 
+    //TODO global fields textWidth textHeight not updating. Fix it
     public void setText(String text) {
         this.text = text;
         applyTextChanges(true);
@@ -140,8 +141,8 @@ public class Loadon extends View {
         textPaint.setAntiAlias(true);
 
         makeLayout();
-        normalWidth = textLayout.getWidth();
-        normalHeight = textLayout.getHeight();
+        textWidth = textLayout.getWidth();
+        textHeight = textLayout.getHeight();
     }
 
     private void initStateAnimator() {
@@ -266,13 +267,30 @@ public class Loadon extends View {
         return loadonPackage != null ? loadonPackage.getName() + '.' + className : "";
     }
 
+    private int getExpandedWidth() {
+        return textWidth + getPaddingLeft() + getPaddingRight();
+    }
+
+    private int getCollapsedWidth() {
+        return textHeight + getPaddingLeft() + getPaddingRight();
+    }
+
+    private void getDrawingRect(@NonNull RectF rectF) {
+        final float left = getPaddingStart();
+        final float top = getPaddingTop();
+        final float right = getWidth() - getPaddingEnd();
+        final float bottom = getHeight() - getPaddingBottom();
+        rectF.set(left, top, right, bottom);
+    }
+
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        int width = state == State.NORMAL ? normalWidth : x;
+        int width = state == State.NORMAL ? getExpandedWidth() : x;
+        int height = textHeight + getPaddingTop() + getPaddingBottom();
         if (state != State.NORMAL) {
-            final float sizeMultiplier = ((float) x - normalHeight) / (normalWidth - normalHeight);
+            final float sizeMultiplier = ((float) x - getCollapsedWidth()) / (getExpandedWidth() - getCollapsedWidth());
             final int multipliedAlpha = (int) (sizeMultiplier * 255);
-            final float multipliedTextSize = sizeMultiplier * this.textSize;
+            final float multipliedTextSize = sizeMultiplier * textSize;
             textPaint.setAlpha(multipliedAlpha);
             textPaint.setTextSize(multipliedTextSize);
         } else {
@@ -280,7 +298,7 @@ public class Loadon extends View {
             textPaint.setAlpha(255);
         }
         makeLayout();
-        setMeasuredDimension(width, normalHeight);
+        setMeasuredDimension(width, height);
     }
 
     @Override
@@ -289,7 +307,7 @@ public class Loadon extends View {
         if (state != State.LOADING) {
             canvas.save();
             final float translationX = (getWidth() - textLayout.getWidth()) / 2f;
-            final float translationY = (normalHeight - textLayout.getHeight()) / 2f;
+            final float translationY = (getHeight() - textLayout.getHeight()) / 2f;
             canvas.translate(translationX, translationY);
             textLayout.draw(canvas);
             canvas.restore();
@@ -299,11 +317,11 @@ public class Loadon extends View {
     }
 
     private void makeLayout() {
-        final int textWidth = (int) textPaint.measureText(text);
+        final int measuredTextWidth = (int) textPaint.measureText(text);
         textLayout = new StaticLayout(
                 text,
                 textPaint,
-                textWidth,
+                measuredTextWidth,
                 Layout.Alignment.ALIGN_NORMAL,
                 1f, 0, false);
     }
@@ -313,7 +331,7 @@ public class Loadon extends View {
             return;
         }
         stateAnimator.cancel();
-        sizeAnimator.setIntValues(getWidth(), normalHeight);
+        sizeAnimator.setIntValues(getWidth(), getCollapsedWidth());
         stateAnimator.start();
     }
 
@@ -322,7 +340,7 @@ public class Loadon extends View {
             return;
         }
         stateAnimator.cancel();
-        sizeAnimator.setIntValues(getWidth(), normalWidth);
+        sizeAnimator.setIntValues(getWidth(), getExpandedWidth());
         sizeAnimator.start();
     }
 
@@ -482,9 +500,7 @@ public class Loadon extends View {
 
         @Override
         public void draw(Loadon loadon, Canvas canvas) {
-            final int width = loadon.getWidth();
-            final int height = loadon.getHeight();
-            indicatorRect.set(0f, 0f, width, height);
+            loadon.getDrawingRect(indicatorRect);
             indicatorRect.inset(STROKE_SIZE, STROKE_SIZE);
 
             final int iteration = (int) getCurrentAnimatedValue() / 2;
