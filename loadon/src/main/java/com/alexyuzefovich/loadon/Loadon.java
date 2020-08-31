@@ -38,17 +38,18 @@ public class Loadon extends View {
     private static final float DEFAULT_TEXT_SIZE = 15f;
     private static final int DEFAULT_TEXT_COLOR = Color.BLACK;
 
-    private TextPaint textPaint = new TextPaint();
-
+    private static final Class<?>[] PROGRESS_INDICATOR_CONSTRUCTOR_SIGNATURE =
+            new Class<?>[]{Context.class, AttributeSet.class, int.class, int.class};
+    
     private String text = "";
     private float textSize = DEFAULT_TEXT_SIZE;
     private int textColor = DEFAULT_TEXT_COLOR;
 
-    private static final Class<?>[] PROGRESS_INDICATOR_CONSTRUCTOR_SIGNATURE =
-            new Class<?>[]{Context.class, AttributeSet.class, int.class, int.class};
+    private TextPaint textPaint = new TextPaint();
 
-    private StaticLayout staticLayout;
+    private StaticLayout textLayout;
 
+    @NonNull
     private State state = State.NORMAL;
 
     private int normalWidth;
@@ -60,18 +61,31 @@ public class Loadon extends View {
     private ValueAnimator sizeAnimator = new ValueAnimator();
 
     @NonNull
-    private ProgressIndicator progressIndicator;
+    private ProgressIndicator progressIndicator = new DefaultProgressIndicator();
 
     @NonNull
     private AnimatorSet stateAnimator = new AnimatorSet();
 
 
-    public Loadon(Context context) {
-        super(context, null);
+    public Loadon(@NonNull Context context) {
+        this(context, null);
     }
 
-    public Loadon(Context context, @Nullable AttributeSet attrs) {
-        super(context, attrs);
+    public Loadon(@NonNull Context context, @Nullable AttributeSet attrs) {
+        this(context, attrs, 0);
+    }
+
+    public Loadon(@NonNull Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
+        this(context, attrs, defStyleAttr, 0);
+    }
+
+    public Loadon(
+            @NonNull Context context,
+            @Nullable AttributeSet attrs,
+            int defStyleAttr,
+            int defStyleRes
+    ) {
+        super(context, attrs, defStyleAttr, defStyleRes);
         if (attrs != null) {
             TypedArray ta = context.getTheme().obtainStyledAttributes(
                     attrs,
@@ -79,18 +93,41 @@ public class Loadon extends View {
                     0, 0);
             initTextDrawing(ta);
             final String progressIndicatorClassName = ta.getString(R.styleable.Loadon_progressIndicator);
-            createProgressIndicator(context, progressIndicatorClassName, attrs, 0, 0);
+            createProgressIndicator(context, progressIndicatorClassName, attrs, defStyleAttr, defStyleRes);
             ta.recycle();
         }
+        initProgressIndicator();
         initStateAnimator();
     }
 
-    public Loadon(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
-        super(context, attrs, defStyleAttr);
+
+    public void setText(String text) {
+        this.text = text;
+        applyTextChanges(true);
     }
 
-    public Loadon(Context context, @Nullable AttributeSet attrs, int defStyleAttr, int defStyleRes) {
-        super(context, attrs, defStyleAttr, defStyleRes);
+    public void setTextSize(float textSize) {
+        this.textSize = textSize;
+        applyTextChanges(false);
+    }
+
+    public void setTextColor(int textColor) {
+        this.textColor = textColor;
+        applyTextChanges(false);
+    }
+
+    public void setProgressIndicator(@NonNull ProgressIndicator progressIndicator) {
+        this.progressIndicator = progressIndicator;
+        invalidate();
+    }
+
+
+    private void applyTextChanges(boolean reMeasure) {
+        makeLayout();
+        invalidate();
+        if (reMeasure) {
+            requestLayout();
+        }
     }
 
     private void initTextDrawing(@NonNull TypedArray ta) {
@@ -103,13 +140,12 @@ public class Loadon extends View {
         textPaint.setAntiAlias(true);
 
         makeLayout();
-        normalWidth = staticLayout.getWidth();
-        normalHeight = staticLayout.getHeight();
+        normalWidth = textLayout.getWidth();
+        normalHeight = textLayout.getHeight();
     }
 
     private void initStateAnimator() {
         initSizeAnimator();
-        initProgressIndicator();
         stateAnimator.playSequentially(
                 sizeAnimator,
                 progressIndicator.getAnimator()
@@ -160,12 +196,16 @@ public class Loadon extends View {
         progressIndicator.setAnimatedValueUpdatedListener(this::invalidate);
     }
 
-    private void createProgressIndicator(Context context, String className, AttributeSet attrs,
-                                     int defStyleAttr, int defStyleRes) {
+    private void createProgressIndicator(
+            @NonNull Context context,
+            @Nullable String className,
+            @NonNull AttributeSet attrs,
+            int defStyleAttr,
+            int defStyleRes
+    ) {
         if (className != null) {
-            className = className.trim();
+            className = getFullClassName(context, className.trim());
             if (!className.isEmpty()) {
-                className = getFullClassName(context, className);
                 try {
                     ClassLoader classLoader;
                     if (isInEditMode()) {
@@ -211,14 +251,19 @@ public class Loadon extends View {
         }
     }
 
-    private String getFullClassName(Context context, String className) {
+    @NonNull
+    private String getFullClassName(
+            @NonNull Context context,
+            @NonNull String className
+    ) {
         if (className.charAt(0) == '.') {
             return context.getPackageName() + className;
         }
         if (className.contains(".")) {
             return className;
         }
-        return Loadon.class.getPackage().getName() + '.' + className;
+        final Package loadonPackage = Loadon.class.getPackage();
+        return loadonPackage != null ? loadonPackage.getName() + '.' + className : "";
     }
 
     @Override
@@ -243,10 +288,10 @@ public class Loadon extends View {
         super.onDraw(canvas);
         if (state != State.LOADING) {
             canvas.save();
-            final float translationX = (getWidth() - staticLayout.getWidth()) / 2f;
-            final float translationY = (normalHeight - staticLayout.getHeight()) / 2f;
+            final float translationX = (getWidth() - textLayout.getWidth()) / 2f;
+            final float translationY = (normalHeight - textLayout.getHeight()) / 2f;
             canvas.translate(translationX, translationY);
-            staticLayout.draw(canvas);
+            textLayout.draw(canvas);
             canvas.restore();
         } else {
             progressIndicator.draw(this, canvas);
@@ -255,7 +300,7 @@ public class Loadon extends View {
 
     private void makeLayout() {
         final int textWidth = (int) textPaint.measureText(text);
-        staticLayout = new StaticLayout(
+        textLayout = new StaticLayout(
                 text,
                 textPaint,
                 textWidth,
@@ -305,8 +350,8 @@ public class Loadon extends View {
         }
 
         public ProgressIndicator(
-                Context context,
-                AttributeSet attrs,
+                @NonNull Context context,
+                @Nullable AttributeSet attrs,
                 int defStyleAttr,
                 int defStyleRes
         ) {
@@ -390,8 +435,8 @@ public class Loadon extends View {
         }
 
         public DefaultProgressIndicator(
-                Context context,
-                AttributeSet attrs,
+                @NonNull Context context,
+                @Nullable AttributeSet attrs,
                 int defStyleAttr,
                 int defStyleRes
         ) {
