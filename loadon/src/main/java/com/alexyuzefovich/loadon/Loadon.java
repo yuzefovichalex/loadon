@@ -36,7 +36,7 @@ public class Loadon extends View {
         EXTENDING
     }
 
-    private static final long SIZE_ANIMATION_DURATION = 500L;
+    private static final long SIZE_ANIMATION_DURATION = 5000L;
 
     private static final float DEFAULT_TEXT_SIZE = 15f;
     private static final int DEFAULT_TEXT_COLOR = Color.BLACK;
@@ -328,9 +328,14 @@ public class Loadon extends View {
     }
 
     private void startStateAnimation(int sizeStartValue, int sizeEndValue) {
+        startStateAnimation(sizeStartValue, sizeEndValue, 0);
+    }
+
+    private void startStateAnimation(int sizeStartValue, int sizeEndValue, long currentPlayTime) {
         stateAnimator.cancel();
         sizeAnimator.setIntValues(sizeStartValue, sizeEndValue);
         stateAnimator.start();
+        sizeAnimator.setCurrentPlayTime(currentPlayTime);
         state = sizeStartValue > sizeEndValue ? State.COLLAPSING : State.EXTENDING;
     }
 
@@ -341,6 +346,7 @@ public class Loadon extends View {
         SavedState savedState = new SavedState(superState);
         savedState.state = state;
         savedState.x = x;
+        savedState.animationPlayTime = sizeAnimator.getCurrentPlayTime();
         return savedState;
     }
 
@@ -353,9 +359,11 @@ public class Loadon extends View {
         SavedState savedState = (SavedState) parcelableState;
         super.onRestoreInstanceState(savedState.getSuperState());
         state = savedState.state;
+        x = savedState.x;
+        final long animationPlayTime = savedState.animationPlayTime;
         switch (state) {
             case EXTENDING: {
-                startStateAnimation(x, getExpandedWidth());
+                startStateAnimation(x, getExpandedWidth(), animationPlayTime);
                 return;
             }
             case LOADING: {
@@ -363,10 +371,9 @@ public class Loadon extends View {
                 return;
             }
             case COLLAPSING: {
-                startStateAnimation(x, getCollapsedWidth());
+                startStateAnimation(x, getCollapsedWidth(), animationPlayTime);
             }
         }
-        x = savedState.x;
     }
 
 
@@ -556,6 +563,8 @@ public class Loadon extends View {
 
         int x;
 
+        long animationPlayTime;
+
         public SavedState(Parcelable superState) {
             super(superState);
         }
@@ -573,11 +582,13 @@ public class Loadon extends View {
             super.writeToParcel(out, flags);
             out.writeInt(state.ordinal());
             out.writeInt(x);
+            out.writeLong(animationPlayTime);
         }
 
         private void readFromParcel(@NonNull Parcel in) {
             state = State.values()[in.readInt()];
             x = in.readInt();
+            animationPlayTime = in.readLong();
         }
 
         public static final Creator<SavedState> CREATOR =
