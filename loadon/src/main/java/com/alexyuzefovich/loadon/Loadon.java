@@ -36,7 +36,7 @@ public class Loadon extends View {
         EXTENDING
     }
 
-    private static final long SIZE_ANIMATION_DURATION = 5000L;
+    private static final long SIZE_ANIMATION_DURATION = 500L;
 
     private static final float DEFAULT_TEXT_SIZE = 15f;
     private static final int DEFAULT_TEXT_COLOR = Color.BLACK;
@@ -346,7 +346,8 @@ public class Loadon extends View {
         SavedState savedState = new SavedState(superState);
         savedState.state = state;
         savedState.x = currentAnimatedWidth;
-        savedState.animationPlayTime = sizeAnimator.getCurrentPlayTime();
+        savedState.sizeAnimationPlayTime = sizeAnimator.getCurrentPlayTime();
+        savedState.indicatorAnimationPlayTime = progressIndicator.getAnimatorCurrentPlayTime();
         return savedState;
     }
 
@@ -360,18 +361,19 @@ public class Loadon extends View {
         super.onRestoreInstanceState(savedState.getSuperState());
         state = savedState.state;
         currentAnimatedWidth = savedState.x;
-        final long animationPlayTime = savedState.animationPlayTime;
+        final long sizeAnimationPlayTime = savedState.sizeAnimationPlayTime;
+        final long indicatorAnimationPlayTime = savedState.indicatorAnimationPlayTime;
         switch (state) {
             case EXTENDING: {
-                startStateAnimation(currentAnimatedWidth, getExpandedWidth(), animationPlayTime);
+                startStateAnimation(currentAnimatedWidth, getExpandedWidth(), sizeAnimationPlayTime);
                 return;
             }
             case LOADING: {
-                progressIndicator.getAnimator().start();
+                progressIndicator.startAnimatorWithTime(indicatorAnimationPlayTime);
                 return;
             }
             case COLLAPSING: {
-                startStateAnimation(currentAnimatedWidth, getCollapsedWidth(), animationPlayTime);
+                startStateAnimation(currentAnimatedWidth, getCollapsedWidth(), sizeAnimationPlayTime);
             }
         }
     }
@@ -431,6 +433,10 @@ public class Loadon extends View {
             return progressIndicatorAnimator;
         }
 
+        long getAnimatorCurrentPlayTime() {
+            return progressIndicatorAnimator.getCurrentPlayTime();
+        }
+
 
         public abstract float[] getValues();
         public abstract int getRepeatCount();
@@ -457,6 +463,11 @@ public class Loadon extends View {
                     animatedValueUpdatedListener.onAnimatedValueUpdated();
                 }
             });
+        }
+
+        void startAnimatorWithTime(long currentPlayTime) {
+            progressIndicatorAnimator.start();
+            progressIndicatorAnimator.setCurrentPlayTime(currentPlayTime);
         }
 
         public abstract void draw(Loadon loadon, Canvas canvas);
@@ -565,7 +576,9 @@ public class Loadon extends View {
 
         int x;
 
-        long animationPlayTime;
+        long sizeAnimationPlayTime;
+
+        long indicatorAnimationPlayTime;
 
         public SavedState(Parcelable superState) {
             super(superState);
@@ -584,13 +597,15 @@ public class Loadon extends View {
             super.writeToParcel(out, flags);
             out.writeInt(state.ordinal());
             out.writeInt(x);
-            out.writeLong(animationPlayTime);
+            out.writeLong(sizeAnimationPlayTime);
+            out.writeLong(indicatorAnimationPlayTime);
         }
 
         private void readFromParcel(@NonNull Parcel in) {
             state = State.values()[in.readInt()];
             x = in.readInt();
-            animationPlayTime = in.readLong();
+            sizeAnimationPlayTime = in.readLong();
+            indicatorAnimationPlayTime = in.readLong();
         }
 
         public static final Creator<SavedState> CREATOR =
