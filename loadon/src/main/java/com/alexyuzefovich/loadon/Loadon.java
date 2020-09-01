@@ -58,7 +58,7 @@ public class Loadon extends View {
     private int textWidth;
     private int textHeight;
 
-    private int x;
+    private int currentAnimatedWidth;
 
     @NonNull
     private ValueAnimator sizeAnimator = new ValueAnimator();
@@ -158,7 +158,7 @@ public class Loadon extends View {
 
     private void initSizeAnimator() {
         sizeAnimator.addUpdateListener(animation -> {
-            x = (int) animation.getAnimatedValue();
+            currentAnimatedWidth = (int) animation.getAnimatedValue();
             invalidate();
             requestLayout();
         });
@@ -272,10 +272,10 @@ public class Loadon extends View {
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        int width = state == State.NORMAL ? getExpandedWidth() : x;
+        int width = state == State.NORMAL ? getExpandedWidth() : currentAnimatedWidth;
         int height = textHeight + getPaddingTop() + getPaddingBottom();
         if (state != State.NORMAL) {
-            final float sizeMultiplier = ((float) x - getCollapsedWidth()) / (getExpandedWidth() - getCollapsedWidth());
+            final float sizeMultiplier = ((float) currentAnimatedWidth - getCollapsedWidth()) / (getExpandedWidth() - getCollapsedWidth());
             final int multipliedAlpha = (int) (sizeMultiplier * 255);
             final float multipliedTextSize = sizeMultiplier * textSize;
             textPaint.setAlpha(multipliedAlpha);
@@ -345,7 +345,7 @@ public class Loadon extends View {
         Parcelable superState = super.onSaveInstanceState();
         SavedState savedState = new SavedState(superState);
         savedState.state = state;
-        savedState.x = x;
+        savedState.x = currentAnimatedWidth;
         savedState.animationPlayTime = sizeAnimator.getCurrentPlayTime();
         return savedState;
     }
@@ -359,11 +359,11 @@ public class Loadon extends View {
         SavedState savedState = (SavedState) parcelableState;
         super.onRestoreInstanceState(savedState.getSuperState());
         state = savedState.state;
-        x = savedState.x;
+        currentAnimatedWidth = savedState.x;
         final long animationPlayTime = savedState.animationPlayTime;
         switch (state) {
             case EXTENDING: {
-                startStateAnimation(x, getExpandedWidth(), animationPlayTime);
+                startStateAnimation(currentAnimatedWidth, getExpandedWidth(), animationPlayTime);
                 return;
             }
             case LOADING: {
@@ -371,7 +371,7 @@ public class Loadon extends View {
                 return;
             }
             case COLLAPSING: {
-                startStateAnimation(x, getCollapsedWidth(), animationPlayTime);
+                startStateAnimation(currentAnimatedWidth, getCollapsedWidth(), animationPlayTime);
             }
         }
     }
@@ -408,7 +408,9 @@ public class Loadon extends View {
             TypedArray ta = context.getTheme().obtainStyledAttributes(
                     attrs,
                     R.styleable.Loadon,
-                    0, 0);
+                    defStyleAttr,
+                    defStyleRes
+            );
             final int textColor = ta.getColor(R.styleable.Loadon_textColor, DEFAULT_TEXT_COLOR);
             progressIndicatorColor = ta.getColor(R.styleable.Loadon_progressIndicatorColor, textColor);
             ta.recycle();
