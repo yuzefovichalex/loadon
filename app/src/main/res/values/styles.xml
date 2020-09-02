@@ -5,6 +5,14 @@
         <item name="colorPrimary">@color/colorPrimary</item>
         <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
         <item name="colorAccent">@color/colorAccent</item>
+        <item name="loadonStyle">@style/Loadon.Default</item>
+    </style>
+
+    <style name="Loadon.Default">
+        <item name="android:padding">8dp</item>
+        <item name="android:backgroundTint">@color/colorAccent</item>
+        <item name="textSize">48sp</item>
+        <item name="textColor">@color/colorPrimary</item>
     </style>
 
 </resources>

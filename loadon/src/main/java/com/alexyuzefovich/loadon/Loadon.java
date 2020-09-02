@@ -63,8 +63,7 @@ public class Loadon extends View {
     @NonNull
     private ValueAnimator sizeAnimator = new ValueAnimator();
 
-    @NonNull
-    private ProgressIndicator progressIndicator = new DefaultProgressIndicator();
+    private ProgressIndicator progressIndicator;
 
     @NonNull
     private AnimatorSet stateAnimator = new AnimatorSet();
@@ -75,11 +74,11 @@ public class Loadon extends View {
     }
 
     public Loadon(@NonNull Context context, @Nullable AttributeSet attrs) {
-        this(context, attrs, 0);
+        this(context, attrs, R.attr.loadonStyle);
     }
 
     public Loadon(@NonNull Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
-        this(context, attrs, defStyleAttr, 0);
+        this(context, attrs, defStyleAttr, R.style.Loadon);
     }
 
     public Loadon(
@@ -93,7 +92,9 @@ public class Loadon extends View {
             TypedArray ta = context.getTheme().obtainStyledAttributes(
                     attrs,
                     R.styleable.Loadon,
-                    0, 0);
+                    defStyleAttr,
+                    defStyleRes
+            );
             initTextDrawing(ta);
             final String progressIndicatorClassName = ta.getString(R.styleable.Loadon_progressIndicator);
             createProgressIndicator(context, progressIndicatorClassName, attrs, defStyleAttr, defStyleRes);
@@ -181,6 +182,9 @@ public class Loadon extends View {
     }
 
     private void initProgressIndicator() {
+        if (progressIndicator == null) {
+            progressIndicator = new DefaultProgressIndicator(getContext());
+        }
         progressIndicator.setAnimatedValueUpdatedListener(this::invalidate);
     }
 
@@ -397,8 +401,8 @@ public class Loadon extends View {
         private AnimatedValueUpdatedListener animatedValueUpdatedListener;
 
 
-        public ProgressIndicator() {
-            initProgressIndicatorAnimator();
+        public ProgressIndicator(@NonNull Context context) {
+            this(context, null, R.attr.loadonStyle, R.style.Loadon);
         }
 
         public ProgressIndicator(
@@ -492,9 +496,8 @@ public class Loadon extends View {
         @NonNull
         private Paint paint = new Paint();
 
-        public DefaultProgressIndicator() {
-            super();
-            initPaint();
+        public DefaultProgressIndicator(@NonNull Context context) {
+            this(context, null, R.attr.loadonStyle, R.style.Loadon);
         }
 
         public DefaultProgressIndicator(
