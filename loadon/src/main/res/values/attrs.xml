@@ -6,6 +6,11 @@
         <attr name="textColor" format="color"/>
         <attr name="progressIndicator" format="string"/>
         <attr name="progressIndicatorColor" format="color"/>
+        <attr name="android:background"/>
+        <attr name="android:backgroundTint"/>
+        <attr name="android:backgroundTintMode"/>
+        <attr name="rippleColor" format="color"/>
+        <attr name="shapeAppearance" format="reference"/>
     </declare-styleable>
     <declare-styleable name="LoadonTheme">
         <attr name="loadonStyle" format="reference"/>

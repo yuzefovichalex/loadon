@@ -6,11 +6,14 @@ import android.animation.AnimatorSet;
 import android.animation.TimeInterpolator;
 import android.animation.ValueAnimator;
 import android.content.Context;
+import android.content.res.ColorStateList;
 import android.content.res.TypedArray;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.PorterDuff;
 import android.graphics.RectF;
+import android.graphics.drawable.Drawable;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.text.Layout;
@@ -24,10 +27,13 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.customview.view.AbsSavedState;
 
+import com.google.android.material.shape.ShapeAppearanceModel;
+import com.google.android.material.shape.Shapeable;
+
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 
-public class Loadon extends View {
+public class Loadon extends View implements Shapeable {
 
     enum State {
         NORMAL,
@@ -68,6 +74,9 @@ public class Loadon extends View {
     @NonNull
     private AnimatorSet stateAnimator = new AnimatorSet();
 
+    @NonNull
+    private LoadonBackgroundHelper loadonBackgroundHelper;
+
 
     public Loadon(@NonNull Context context) {
         this(context, null);
@@ -102,6 +111,8 @@ public class Loadon extends View {
         }
         initProgressIndicator();
         initStateAnimator();
+
+        loadonBackgroundHelper = new LoadonBackgroundHelper(this, attrs, defStyleAttr, defStyleRes);
     }
 
 
@@ -124,6 +135,53 @@ public class Loadon extends View {
     public void setProgressIndicator(@NonNull ProgressIndicator progressIndicator) {
         this.progressIndicator = progressIndicator;
         invalidate();
+    }
+
+    @Override
+    public void setBackground(Drawable background) {
+        super.setBackground(background);
+    }
+
+    void setBackgroundInternal(Drawable background) {
+        super.setBackground(background);
+    }
+
+    @Override
+    public void setBackgroundColor(int color) {
+        if (loadonBackgroundHelper.isUserBackgroundSet()) {
+            loadonBackgroundHelper.setBackgroundColor(color);
+        } else {
+            super.setBackgroundColor(color);
+        }
+    }
+
+    @Override
+    public void setBackgroundTintList(@Nullable ColorStateList tint) {
+        if (loadonBackgroundHelper.isUserBackgroundSet()) {
+            loadonBackgroundHelper.setBackgroundTint(tint);
+        } else {
+            super.setBackgroundTintList(tint);
+        }
+    }
+
+    @Override
+    public void setBackgroundTintMode(@Nullable PorterDuff.Mode tintMode) {
+        if (loadonBackgroundHelper.isUserBackgroundSet()) {
+            loadonBackgroundHelper.setBackgroundTintMode(tintMode);
+        } else {
+            super.setBackgroundTintMode(tintMode);
+        }
+    }
+
+    @NonNull
+    @Override
+    public ShapeAppearanceModel getShapeAppearanceModel() {
+        return loadonBackgroundHelper.getShapeAppearanceModel();
+    }
+
+    @Override
+    public void setShapeAppearanceModel(@NonNull ShapeAppearanceModel shapeAppearanceModel) {
+        loadonBackgroundHelper.setShapeAppearanceModel(shapeAppearanceModel);
     }
 
 
