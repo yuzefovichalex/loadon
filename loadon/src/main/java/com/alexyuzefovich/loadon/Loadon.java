@@ -186,7 +186,7 @@ public class Loadon extends View implements Shapeable {
 
 
     private void applyTextChanges(boolean reMeasure) {
-        makeLayout();
+        makeLayout(getWidth());
         invalidate();
         if (reMeasure) {
             requestLayout();
@@ -202,9 +202,9 @@ public class Loadon extends View implements Shapeable {
         textPaint.setColor(textColor);
         textPaint.setAntiAlias(true);
 
-        makeLayout();
-        textWidth = textLayout.getWidth();
-        textHeight = textLayout.getHeight();
+        // Initially we set textWidth as full text width in one line (without line breaks).
+        // In onMeasure we'll get final view desired (or max) width, so we can set correct width.
+        textWidth = (int) textPaint.measureText(text);
     }
 
     private void initStateAnimator() {
@@ -334,20 +334,53 @@ public class Loadon extends View implements Shapeable {
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        int width = state == State.NORMAL ? getExpandedWidth() : currentAnimatedWidth;
-        int height = textHeight + getPaddingTop() + getPaddingBottom();
-        if (state != State.NORMAL) {
-            final float sizeMultiplier = ((float) currentAnimatedWidth - getCollapsedWidth()) / (getExpandedWidth() - getCollapsedWidth());
-            final int multipliedAlpha = (int) (sizeMultiplier * 255);
-            final float multipliedTextSize = sizeMultiplier * textSize;
-            textPaint.setAlpha(multipliedAlpha);
-            textPaint.setTextSize(multipliedTextSize);
+        final int desiredWidth;
+        final int desiredHeight;
+
+        final int finalWidth;
+        final int finalHeight;
+
+        if (textLayout == null) {
+            // First measure: make text layout and update textWidth based on possible view width
+            desiredWidth = getExpandedWidth();
+            finalWidth = resolveSize(desiredWidth, widthMeasureSpec);
+
+            int targetTextWidth = excludeHorizontalPadding(Math.min(desiredWidth, finalWidth));
+            makeLayout(targetTextWidth);
+
+            desiredHeight = textHeight + getPaddingTop() + getPaddingBottom();
+            finalHeight = resolveSize(desiredHeight, heightMeasureSpec);
         } else {
-            textPaint.setTextSize(textSize);
-            textPaint.setAlpha(255);
+            // Second and others measure: simple handle normal or on animation re-measure
+            desiredWidth = state == State.NORMAL ? getExpandedWidth() : currentAnimatedWidth;
+            desiredHeight = textHeight + getPaddingTop() + getPaddingBottom();
+
+            if (state != State.NORMAL) {
+                final float sizeMultiplier = ((float) currentAnimatedWidth - getCollapsedWidth()) / (getExpandedWidth() - getCollapsedWidth());
+                final int multipliedAlpha = (int) (sizeMultiplier * 255);
+                final float multipliedTextSize = sizeMultiplier * textSize;
+                textPaint.setAlpha(multipliedAlpha);
+                textPaint.setTextSize(multipliedTextSize);
+
+                finalWidth = desiredWidth;
+                finalHeight = desiredHeight;
+            } else {
+                textPaint.setTextSize(textSize);
+                textPaint.setAlpha(255);
+
+                finalWidth = resolveSize(desiredWidth, widthMeasureSpec);
+                finalHeight = resolveSize(desiredHeight, heightMeasureSpec);
+            }
+
+            final int targetTextWidth = excludeHorizontalPadding(finalWidth);
+            makeLayout(targetTextWidth);
         }
-        makeLayout();
-        setMeasuredDimension(width, height);
+
+        setMeasuredDimension(finalWidth, finalHeight);
+    }
+
+    private int excludeHorizontalPadding(int paddedWidth) {
+        return paddedWidth - getPaddingStart() - getPaddingEnd();
     }
 
     @Override
@@ -365,14 +398,19 @@ public class Loadon extends View implements Shapeable {
         }
     }
 
-    private void makeLayout() {
-        final int measuredTextWidth = (int) textPaint.measureText(text);
+    private void makeLayout(int availableWidth) {
+        final boolean isFirstMake = textLayout == null;
         textLayout = new StaticLayout(
                 text,
                 textPaint,
-                measuredTextWidth,
-                Layout.Alignment.ALIGN_NORMAL,
+                availableWidth,
+                Layout.Alignment.ALIGN_CENTER,
                 1f, 0, false);
+        // We firstly get availableWidth (view width from onMeasure), so finally set textWidth & textHeight
+        if (isFirstMake) {
+            textWidth = textLayout.getWidth();
+            textHeight = textLayout.getHeight();
+        }
     }
 
     public void startLoading() {
