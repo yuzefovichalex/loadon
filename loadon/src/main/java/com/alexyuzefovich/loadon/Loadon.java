@@ -39,7 +39,13 @@ public class Loadon extends View implements Shapeable {
         NORMAL,
         COLLAPSING,
         LOADING,
-        EXTENDING
+        EXTENDING,
+        SUCCEED,
+        FAILED;
+
+        boolean isIndicationState() {
+            return this == LOADING || this == SUCCEED || this == FAILED;
+        }
     }
 
     private static final long SIZE_ANIMATION_DURATION = 500L;
@@ -243,7 +249,7 @@ public class Loadon extends View implements Shapeable {
         if (progressIndicator == null) {
             progressIndicator = new DefaultProgressIndicator(getContext());
         }
-        progressIndicator.setAnimatedValueUpdatedListener(this::invalidate);
+        progressIndicator.setDrawingListener(this::invalidate);
     }
 
     private void createProgressIndicator(
@@ -386,7 +392,7 @@ public class Loadon extends View implements Shapeable {
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
-        if (state != State.LOADING) {
+        if (!state.isIndicationState()) {
             canvas.save();
             final float translationX = (getWidth() - textLayout.getWidth()) / 2f;
             final float translationY = (getHeight() - textLayout.getHeight()) / 2f;
@@ -420,11 +426,17 @@ public class Loadon extends View implements Shapeable {
         startStateAnimation(getWidth(), getCollapsedWidth());
     }
 
-    public void stopLoading() {
+    public void stopLoading(boolean isSuccessful) {
         if (state == State.NORMAL) {
             return;
         }
-        startStateAnimation(getWidth(), getExpandedWidth());
+        if (isSuccessful) {
+            state = State.SUCCEED;
+            progressIndicator.onSuccess();
+        } else {
+            state = State.FAILED;
+            progressIndicator.onFailure();
+        }
     }
 
     private void startStateAnimation(int sizeStartValue, int sizeEndValue) {
@@ -479,10 +491,15 @@ public class Loadon extends View implements Shapeable {
     }
 
 
-    public abstract static class ProgressIndicator {
+    public interface LoadingFinishListener {
+        void onSuccess();
+        void onFailure();
+    }
 
-        interface AnimatedValueUpdatedListener {
-            void onAnimatedValueUpdated();
+    public abstract static class ProgressIndicator implements LoadingFinishListener {
+
+        interface DrawingListener {
+            void requestDraw();
         }
 
 
@@ -494,7 +511,7 @@ public class Loadon extends View implements Shapeable {
         private ValueAnimator progressIndicatorAnimator = new ValueAnimator();
 
         @Nullable
-        private AnimatedValueUpdatedListener animatedValueUpdatedListener;
+        private DrawingListener drawingListener;
 
 
         public ProgressIndicator(@NonNull Context context) {
@@ -546,8 +563,8 @@ public class Loadon extends View implements Shapeable {
         public abstract TimeInterpolator getInterpolator();
 
 
-        public void setAnimatedValueUpdatedListener(@Nullable AnimatedValueUpdatedListener animatedValueUpdatedListener) {
-            this.animatedValueUpdatedListener = animatedValueUpdatedListener;
+        public void setDrawingListener(@Nullable DrawingListener drawingListener) {
+            this.drawingListener = drawingListener;
         }
 
 
@@ -559,10 +576,14 @@ public class Loadon extends View implements Shapeable {
             progressIndicatorAnimator.setDuration(getDuration());
             progressIndicatorAnimator.addUpdateListener(animation -> {
                 currentAnimatedValue = (float) animation.getAnimatedValue();
-                if (animatedValueUpdatedListener != null) {
-                    animatedValueUpdatedListener.onAnimatedValueUpdated();
-                }
+                requestDraw();
             });
+        }
+
+        protected void requestDraw() {
+            if (drawingListener != null) {
+                drawingListener.requestDraw();
+            }
         }
 
         void startAnimatorWithTime(long currentPlayTime) {
@@ -570,7 +591,7 @@ public class Loadon extends View implements Shapeable {
             progressIndicatorAnimator.setCurrentPlayTime(currentPlayTime);
         }
 
-        public abstract void draw(Loadon loadon, Canvas canvas);
+        public abstract void draw(@NonNull Loadon loadon, @NonNull Canvas canvas);
 
     }
 
@@ -592,6 +613,15 @@ public class Loadon extends View implements Shapeable {
         @NonNull
         private Paint paint = new Paint();
 
+        private int successIconAnimatedValue;
+
+        @NonNull
+        private ValueAnimator successIconAnimator = new ValueAnimator();
+
+        @NonNull
+        private ValueAnimator failureIconAnimator = new ValueAnimator();
+
+
         public DefaultProgressIndicator(@NonNull Context context) {
             this(context, null, R.attr.loadonStyle, R.style.Loadon);
         }
@@ -604,6 +634,8 @@ public class Loadon extends View implements Shapeable {
         ) {
             super(context, attrs, defStyleAttr, defStyleRes);
             initPaint();
+            initSuccessIconAnimator();
+            initFailureIconAnimator();
         }
 
         private void initPaint() {
@@ -614,6 +646,18 @@ public class Loadon extends View implements Shapeable {
             paint.setStrokeCap(Paint.Cap.ROUND);
         }
 
+        private void initSuccessIconAnimator() {
+            successIconAnimator.setIntValues(0, 100);
+            successIconAnimator.setDuration(5000);
+            successIconAnimator.addUpdateListener(animation -> {
+                successIconAnimatedValue = (int) animation.getAnimatedValue();
+                requestDraw();
+            });
+        }
+
+        private void initFailureIconAnimator() {
+
+        }
 
         @Override
         public float[] getValues() {
@@ -641,9 +685,36 @@ public class Loadon extends View implements Shapeable {
             return new LinearInterpolator();
         }
 
+        @Override
+        public void onSuccess() {
+            successIconAnimator.start();
+        }
 
         @Override
-        public void draw(Loadon loadon, Canvas canvas) {
+        public void onFailure() {
+            failureIconAnimator.start();
+        }
+
+        @Override
+        public void draw(@NonNull Loadon loadon, @NonNull Canvas canvas) {
+            switch (loadon.state) {
+                case LOADING: {
+                    drawIndicator(loadon, canvas);
+                    return;
+                }
+                case SUCCEED: {
+                    drawSuccessIcon(loadon, canvas);
+                    return;
+                }
+                case FAILED: {
+                    drawFailureIcon(loadon, canvas);
+                    return;
+                }
+                default: { }
+            }
+        }
+
+        private void drawIndicator(@NonNull Loadon loadon, @NonNull Canvas canvas) {
             loadon.getDrawingRect(indicatorRect);
             indicatorRect.inset(STROKE_SIZE, STROKE_SIZE);
 
@@ -664,6 +735,16 @@ public class Loadon extends View implements Shapeable {
             canvas.drawArc(indicatorRect, startAngle, sweepAngle, false, paint);
 
             canvas.restore();
+        }
+
+        private void drawSuccessIcon(@NonNull Loadon loadon, @NonNull Canvas canvas) {
+            loadon.getDrawingRect(indicatorRect);
+            float multiplier = successIconAnimatedValue / 100f;
+            canvas.drawCircle(indicatorRect.centerX(), indicatorRect.centerY(), loadon.getWidth() / 2f * multiplier, paint);
+        }
+
+        private void drawFailureIcon(@NonNull Loadon loadon, @NonNull Canvas canvas) {
+
         }
 
     }

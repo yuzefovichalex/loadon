@@ -16,16 +16,13 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         final Loadon loadon = findViewById(R.id.loadon);
-        loadon.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (!b) {
-                    loadon.startLoading();
-                    b = true;
-                } else {
-                    loadon.stopLoading();
-                    b = false;
-                }
+        loadon.setOnClickListener(v -> {
+            if (!b) {
+                loadon.startLoading();
+                b = true;
+            } else {
+                loadon.stopLoading(true);
+                b = false;
             }
         });
     }
