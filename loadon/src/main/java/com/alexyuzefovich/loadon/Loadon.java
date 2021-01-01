@@ -60,7 +60,7 @@ public class Loadon extends View implements Shapeable {
     private float textSize = DEFAULT_TEXT_SIZE;
     private int textColor = DEFAULT_TEXT_COLOR;
 
-    private TextPaint textPaint = new TextPaint();
+    private final TextPaint textPaint = new TextPaint();
 
     private StaticLayout textLayout;
 
@@ -73,15 +73,15 @@ public class Loadon extends View implements Shapeable {
     private int currentAnimatedWidth;
 
     @NonNull
-    private ValueAnimator sizeAnimator = new ValueAnimator();
+    private final ValueAnimator sizeAnimator = new ValueAnimator();
 
     private ProgressIndicator progressIndicator;
 
     @NonNull
-    private AnimatorSet stateAnimator = new AnimatorSet();
+    private final AnimatorSet stateAnimator = new AnimatorSet();
 
     @NonNull
-    private LoadonBackgroundHelper loadonBackgroundHelper;
+    private final LoadonBackgroundHelper loadonBackgroundHelper;
 
 
     public Loadon(@NonNull Context context) {
@@ -103,22 +103,81 @@ public class Loadon extends View implements Shapeable {
             int defStyleRes
     ) {
         super(context, attrs, defStyleAttr, defStyleRes);
-        if (attrs != null) {
-            TypedArray ta = context.getTheme().obtainStyledAttributes(
-                    attrs,
-                    R.styleable.Loadon,
-                    defStyleAttr,
-                    defStyleRes
-            );
-            initTextDrawing(ta);
-            final String progressIndicatorClassName = ta.getString(R.styleable.Loadon_progressIndicator);
-            createProgressIndicator(context, progressIndicatorClassName, attrs, defStyleAttr, defStyleRes);
-            ta.recycle();
-        }
+        initFromAttrs(context, attrs, defStyleAttr, defStyleRes);
         initProgressIndicator();
         initStateAnimator();
 
         loadonBackgroundHelper = new LoadonBackgroundHelper(this, attrs, defStyleAttr, defStyleRes);
+    }
+
+    private void initFromAttrs(
+            @NonNull Context context,
+            @Nullable AttributeSet attrs,
+            int defStyleAttr,
+            int defStyleRes
+    ) {
+        TypedArray ta = context.getTheme().obtainStyledAttributes(
+                attrs,
+                R.styleable.Loadon,
+                defStyleAttr,
+                defStyleRes
+        );
+
+        text = ta.getString(R.styleable.Loadon_text);
+        textSize = ta.getDimension(R.styleable.Loadon_textSize, DEFAULT_TEXT_SIZE);
+        textColor = ta.getColor(R.styleable.Loadon_textColor, DEFAULT_TEXT_COLOR);
+
+        textPaint.setTextSize(textSize);
+        textPaint.setColor(textColor);
+        textPaint.setAntiAlias(true);
+
+        // Initially we set textWidth as full text width in one line (without line breaks).
+        // In onMeasure we'll get final view desired (or max) width, so we can set correct width.
+        textWidth = (int) textPaint.measureText(text);
+
+        final String progressIndicatorClassName = ta.getString(R.styleable.Loadon_progressIndicator);
+        createProgressIndicator(context, progressIndicatorClassName, attrs, defStyleAttr, defStyleRes);
+
+        ta.recycle();
+    }
+
+    private void initStateAnimator() {
+        initSizeAnimator();
+        stateAnimator.playSequentially(
+                sizeAnimator,
+                progressIndicator.getAnimator()
+        );
+    }
+
+    private void initSizeAnimator() {
+        sizeAnimator.addUpdateListener(animation -> {
+            currentAnimatedWidth = (int) animation.getAnimatedValue();
+            invalidate();
+            requestLayout();
+        });
+        sizeAnimator.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                switch (state) {
+                    case COLLAPSING: {
+                        state = State.LOADING;
+                        break;
+                    }
+                    case EXTENDING: {
+                        state = State.NORMAL;
+                        break;
+                    }
+                }
+            }
+        });
+        sizeAnimator.setDuration(SIZE_ANIMATION_DURATION);
+    }
+
+    private void initProgressIndicator() {
+        if (progressIndicator == null) {
+            progressIndicator = new DefaultProgressIndicator(getContext());
+        }
+        progressIndicator.setDrawingListener(this::invalidate);
     }
 
 
@@ -197,59 +256,6 @@ public class Loadon extends View implements Shapeable {
         if (reMeasure) {
             requestLayout();
         }
-    }
-
-    private void initTextDrawing(@NonNull TypedArray ta) {
-        text = ta.getString(R.styleable.Loadon_text);
-        textSize = ta.getDimension(R.styleable.Loadon_textSize, DEFAULT_TEXT_SIZE);
-        textColor = ta.getColor(R.styleable.Loadon_textColor, DEFAULT_TEXT_COLOR);
-
-        textPaint.setTextSize(textSize);
-        textPaint.setColor(textColor);
-        textPaint.setAntiAlias(true);
-
-        // Initially we set textWidth as full text width in one line (without line breaks).
-        // In onMeasure we'll get final view desired (or max) width, so we can set correct width.
-        textWidth = (int) textPaint.measureText(text);
-    }
-
-    private void initStateAnimator() {
-        initSizeAnimator();
-        stateAnimator.playSequentially(
-                sizeAnimator,
-                progressIndicator.getAnimator()
-        );
-    }
-
-    private void initSizeAnimator() {
-        sizeAnimator.addUpdateListener(animation -> {
-            currentAnimatedWidth = (int) animation.getAnimatedValue();
-            invalidate();
-            requestLayout();
-        });
-        sizeAnimator.addListener(new AnimatorListenerAdapter() {
-            @Override
-            public void onAnimationEnd(Animator animation) {
-                switch (state) {
-                    case COLLAPSING: {
-                        state = State.LOADING;
-                        break;
-                    }
-                    case EXTENDING: {
-                        state = State.NORMAL;
-                        break;
-                    }
-                }
-            }
-        });
-        sizeAnimator.setDuration(SIZE_ANIMATION_DURATION);
-    }
-
-    private void initProgressIndicator() {
-        if (progressIndicator == null) {
-            progressIndicator = new DefaultProgressIndicator(getContext());
-        }
-        progressIndicator.setDrawingListener(this::invalidate);
     }
 
     private void createProgressIndicator(
@@ -508,7 +514,7 @@ public class Loadon extends View implements Shapeable {
         private float currentAnimatedValue = 0f;
 
         @NonNull
-        private ValueAnimator progressIndicatorAnimator = new ValueAnimator();
+        private final ValueAnimator progressIndicatorAnimator = new ValueAnimator();
 
         @Nullable
         private DrawingListener drawingListener;
@@ -524,16 +530,27 @@ public class Loadon extends View implements Shapeable {
                 int defStyleAttr,
                 int defStyleRes
         ) {
+            initFromAttrs(context, attrs, defStyleAttr, defStyleRes);
+            initProgressIndicatorAnimator();
+        }
+
+        private void initFromAttrs(
+                @NonNull Context context,
+                @Nullable AttributeSet attrs,
+                int defStyleAttr,
+                int defStyleRes
+        ) {
             TypedArray ta = context.getTheme().obtainStyledAttributes(
                     attrs,
                     R.styleable.Loadon,
                     defStyleAttr,
                     defStyleRes
             );
+
             final int textColor = ta.getColor(R.styleable.Loadon_textColor, DEFAULT_TEXT_COLOR);
             progressIndicatorColor = ta.getColor(R.styleable.Loadon_progressIndicatorColor, textColor);
+
             ta.recycle();
-            initProgressIndicatorAnimator();
         }
 
 
@@ -608,18 +625,18 @@ public class Loadon extends View implements Shapeable {
         private static final long ANIMATION_DURATION = 8000L;
 
         @NonNull
-        private RectF indicatorRect = new RectF();
+        private final RectF indicatorRect = new RectF();
 
         @NonNull
-        private Paint paint = new Paint();
+        private final Paint paint = new Paint();
 
         private int successIconAnimatedValue;
 
         @NonNull
-        private ValueAnimator successIconAnimator = new ValueAnimator();
+        private final ValueAnimator successIconAnimator = new ValueAnimator();
 
         @NonNull
-        private ValueAnimator failureIconAnimator = new ValueAnimator();
+        private final ValueAnimator failureIconAnimator = new ValueAnimator();
 
 
         public DefaultProgressIndicator(@NonNull Context context) {
