@@ -3,7 +3,6 @@ package com.alexyuzefovich.loadon;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
-import android.animation.TimeInterpolator;
 import android.animation.ValueAnimator;
 import android.content.Context;
 import android.content.res.ColorStateList;
@@ -465,7 +464,7 @@ public class Loadon extends View implements Shapeable {
         savedState.state = state;
         savedState.x = currentAnimatedWidth;
         savedState.sizeAnimationPlayTime = sizeAnimator.getCurrentPlayTime();
-        savedState.indicatorAnimationPlayTime = progressIndicator.getAnimatorCurrentPlayTime();
+        savedState.indicatorAnimationPlayTime = progressIndicator.getAnimator().getCurrentPlayTime();
         return savedState;
     }
 
@@ -487,7 +486,9 @@ public class Loadon extends View implements Shapeable {
                 return;
             }
             case LOADING: {
-                progressIndicator.startAnimatorWithTime(indicatorAnimationPlayTime);
+                final ValueAnimator indicatorAnimator = progressIndicator.getAnimator();
+                indicatorAnimator.start();
+                indicatorAnimator.setCurrentPlayTime(indicatorAnimationPlayTime);
                 return;
             }
             case COLLAPSING: {
@@ -497,12 +498,7 @@ public class Loadon extends View implements Shapeable {
     }
 
 
-    public interface LoadingFinishListener {
-        void onSuccess();
-        void onFailure();
-    }
-
-    public abstract static class ProgressIndicator implements LoadingFinishListener {
+    public abstract static class ProgressIndicator {
 
         interface DrawingListener {
             void requestDraw();
@@ -510,11 +506,6 @@ public class Loadon extends View implements Shapeable {
 
 
         private int progressIndicatorColor;
-
-        private float currentAnimatedValue = 0f;
-
-        @NonNull
-        private final ValueAnimator progressIndicatorAnimator = new ValueAnimator();
 
         @Nullable
         private DrawingListener drawingListener;
@@ -531,7 +522,6 @@ public class Loadon extends View implements Shapeable {
                 int defStyleRes
         ) {
             initFromAttrs(context, attrs, defStyleAttr, defStyleRes);
-            initProgressIndicatorAnimator();
         }
 
         private void initFromAttrs(
@@ -558,44 +548,10 @@ public class Loadon extends View implements Shapeable {
             return progressIndicatorColor;
         }
 
-        public float getCurrentAnimatedValue() {
-            return currentAnimatedValue;
-        }
-
-        @NonNull
-        ValueAnimator getAnimator() {
-            return progressIndicatorAnimator;
-        }
-
-        long getAnimatorCurrentPlayTime() {
-            return progressIndicatorAnimator.getCurrentPlayTime();
-        }
-
-
-        public abstract float[] getValues();
-        public abstract int getRepeatCount();
-        public abstract int getRepeatMode();
-        public abstract long getDuration();
-        @NonNull
-        public abstract TimeInterpolator getInterpolator();
-
-
         public void setDrawingListener(@Nullable DrawingListener drawingListener) {
             this.drawingListener = drawingListener;
         }
 
-
-        private void initProgressIndicatorAnimator() {
-            progressIndicatorAnimator.setFloatValues(getValues());
-            progressIndicatorAnimator.setRepeatCount(getRepeatCount());
-            progressIndicatorAnimator.setRepeatMode(getRepeatMode());
-            progressIndicatorAnimator.setInterpolator(getInterpolator());
-            progressIndicatorAnimator.setDuration(getDuration());
-            progressIndicatorAnimator.addUpdateListener(animation -> {
-                currentAnimatedValue = (float) animation.getAnimatedValue();
-                requestDraw();
-            });
-        }
 
         protected void requestDraw() {
             if (drawingListener != null) {
@@ -603,10 +559,13 @@ public class Loadon extends View implements Shapeable {
             }
         }
 
-        void startAnimatorWithTime(long currentPlayTime) {
-            progressIndicatorAnimator.start();
-            progressIndicatorAnimator.setCurrentPlayTime(currentPlayTime);
-        }
+
+        @NonNull
+        abstract ValueAnimator getAnimator();
+
+        abstract void onSuccess();
+
+        abstract void onFailure();
 
         public abstract void draw(@NonNull Loadon loadon, @NonNull Canvas canvas);
 
@@ -630,7 +589,12 @@ public class Loadon extends View implements Shapeable {
         @NonNull
         private final Paint paint = new Paint();
 
+        private float currentAnimatedValue = 0f;
+
         private int successIconAnimatedValue;
+
+        @NonNull
+        private final ValueAnimator indicatorAnimator = new ValueAnimator();
 
         @NonNull
         private final ValueAnimator successIconAnimator = new ValueAnimator();
@@ -651,8 +615,21 @@ public class Loadon extends View implements Shapeable {
         ) {
             super(context, attrs, defStyleAttr, defStyleRes);
             initPaint();
+            initIndicatorAnimator();
             initSuccessIconAnimator();
             initFailureIconAnimator();
+        }
+
+        private void initIndicatorAnimator() {
+            indicatorAnimator.setFloatValues(START_ANIMATION_VALUE, END_ANIMATION_VALUE);
+            indicatorAnimator.setRepeatCount(ValueAnimator.INFINITE);
+            indicatorAnimator.setRepeatMode(ValueAnimator.RESTART);
+            indicatorAnimator.setInterpolator(new LinearInterpolator());
+            indicatorAnimator.setDuration(ANIMATION_DURATION);
+            indicatorAnimator.addUpdateListener(animation -> {
+                currentAnimatedValue = (float) animation.getAnimatedValue();
+                requestDraw();
+            });
         }
 
         private void initPaint() {
@@ -676,30 +653,11 @@ public class Loadon extends View implements Shapeable {
 
         }
 
-        @Override
-        public float[] getValues() {
-            return new float[] { START_ANIMATION_VALUE, END_ANIMATION_VALUE };
-        }
-
-        @Override
-        public int getRepeatCount() {
-            return ValueAnimator.INFINITE;
-        }
-
-        @Override
-        public int getRepeatMode() {
-            return ValueAnimator.RESTART;
-        }
-
-        @Override
-        public long getDuration() {
-            return ANIMATION_DURATION;
-        }
 
         @NonNull
         @Override
-        public TimeInterpolator getInterpolator() {
-            return new LinearInterpolator();
+        ValueAnimator getAnimator() {
+            return indicatorAnimator;
         }
 
         @Override
@@ -735,8 +693,8 @@ public class Loadon extends View implements Shapeable {
             loadon.getDrawingRect(indicatorRect);
             indicatorRect.inset(STROKE_SIZE, STROKE_SIZE);
 
-            final int iteration = (int) getCurrentAnimatedValue() / 2;
-            final float animValue = getCurrentAnimatedValue() - iteration * 2f;
+            final int iteration = (int) currentAnimatedValue / 2;
+            final float animValue = currentAnimatedValue - iteration * 2f;
 
             canvas.save();
 
